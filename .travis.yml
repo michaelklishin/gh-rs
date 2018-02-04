@@ -1,8 +1,11 @@
 language: rust
 rust:
-  - stable
-  - beta
-  - nightly
+- stable
+- beta
+- nightly
 matrix:
   allow_failures:
-    - rust: nightly
+  - rust: nightly
+env:
+  global:
+    secure: DRc4zCZgdn9Q8qMxrBN25wGeOLX688S9KsBhhwF5FZDChxMy5Tug0cG8bjXTBaCB2IVImgSsNfcoqayekQPez48I864UmiI+C790U5hnYOfYtOo9rkKKI2R3Izg249UCRlhTCbbNjLS+Tgqx9VSV/LRR6MitsjdqNYYXuzyaxQS8wRsIfL1+QqmV/Z2HDP9QQSFV+k7Z0+86K0hr7uVs30h5pltD0FbrpSdnzAuAyhWDEaD6wG0qftMU9gYsNj/233C9u277yfsGOMGqbkGfel0O4vpXs6Po3IZp9MPSEWxxf2a+ANwiJj1xoXVTwHNyH8kXxTA+L65Uq91MAlzDADA3AeyiXgdKHRibv6l+a9HJQ4AmT996H91nXUiW/1xe2ihyi4Byv9T/vCfWG2doXQnoLp81dzTbJMzoYfHxHdhr+tQ5IlruUzQERg5uzOOeVyrZoxiqoT7EvMOX9rwl2buy+lzjctBCcgX5WbkTkVfSRcoIMbAEs4ftgSxrNmc7JlaDDKAkqpSjCefNyHvOp1huuxrkX7GxizF4r2NdoJ14tZ3wgJoJVVK+5u7yUaM2ltE6+lcFbH8giOnO5UpY9LY95wtae9zH4KF2LnQtEmYvu+anwsl6gs9vWqrqm/SZdvHm+/hfEQPLRO7U5xznxEf3P/T+0esMs67U4bYAArM=
