@@ -3,6 +3,7 @@ rust:
 - stable
 - beta
 - nightly
+install: cargo build
 matrix:
   allow_failures:
   - rust: nightly
