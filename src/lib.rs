@@ -98,6 +98,10 @@ impl Client {
             .map_err(|e| Error::SerializationError(e) )
     }
 
+    pub fn open_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone, self::Error> {
+        self.update_milestone_state(user, repo, number, &milestones::State::Open)
+    }
+
     pub fn get_milestone_with_title(&self, user: &str, repo: &str, title: &str)
                                     -> Result<milestones::Milestone, self::Error> {
         let milestones = self.list_milestones(user, repo)?;
