@@ -10,7 +10,7 @@ pub mod milestones;
 pub mod repos;
 pub mod users;
 
-const USER_AGENT: &str = "github.com/rabbitmq/mrmm";
+const USER_AGENT: &str = "github.com/michaelklishin/gh-rs";
 const API_BASE: &str = "https://api.github.com";
 
 pub fn client(token: &String) -> Client {
