@@ -13,7 +13,7 @@ pub mod users;
 const USER_AGENT: &str = "github.com/michaelklishin/gh-rs";
 const API_BASE: &str = "https://api.github.com";
 
-pub fn client(token: &String) -> Client {
+pub fn client(token: &str) -> Client {
     Client::new(token)
 }
 
@@ -37,7 +37,7 @@ impl Client {
     // API
     //
 
-    pub fn new(token: &String) -> Client {
+    pub fn new(token: &str) -> Client {
         let hs = build_default_headers(token);
         let mut builder = build_http_request_builder(hs);
 
@@ -191,7 +191,7 @@ fn build_http_request_builder(hs: reqwest::header::Headers) -> reqwest::ClientBu
     builder
 }
 
-fn build_default_headers(token: &String) -> reqwest::header::Headers {
+fn build_default_headers(token: &str) -> reqwest::header::Headers {
     let mut authorization_val: String = String::from("token ");
     authorization_val.push_str(token);
 
