@@ -5,34 +5,23 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
+extern crate failure;
 #[macro_use]
-extern crate error_chain;
+extern crate failure_derive;
 
 use reqwest::header;
 
-mod errors {
-    error_chain! {
-        errors {
-            NotFound {
-                description("API responded with 404 Not Found")
-                display("404 Not Found")
-            }
+#[derive(Debug, Fail)]
+pub enum ResponseError {
+    #[fail(display = "API responded with 404 Not Found")]
+    NotFound,
 
-            HTTPError {
-                description("HTTP request error")
-                display("HTTP request resulted in an error")
-            }
+    #[fail(display = "HTTP request resulted in an error: {}", _0)]
+    HTTPError(#[cause] reqwest::Error),
 
-            SerializationError {
-                description("[de]serialization error")
-                display("JSON serialization failed")
-            }
-
-        }
-    }
+    #[fail(display = "JSON serialization failed: {}", _0)]
+    SerializationError(#[cause] serde_json::error::Error)
 }
-
-use errors::*;
 
 pub mod milestones;
 pub mod repos;
@@ -50,11 +39,6 @@ pub struct Client {
     http_client: self::reqwest::Client
 }
 
-#[derive(Debug)]
-pub enum Error {
-
-}
-
 impl Client {
 
     //
@@ -70,111 +54,115 @@ impl Client {
         }
     }
 
-    pub fn current_user(&self) -> Result<users::User> {
+    pub fn current_user(&self) -> Result<users::User, ResponseError> {
         let path = format!("{}/{}", API_BASE, "user");
         let mut res = self.http_client
             .get(&path)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
         serde_json::from_str::<users::User>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    pub fn list_repos_of_org(&self, org: &str) -> Result<Vec<repos::Repo>> {
+    pub fn list_repos_of_org(&self, org: &str) -> Result<Vec<repos::Repo>, ResponseError> {
         let path = format!("{}/orgs/{}/repos", API_BASE, org);
         let mut res = self.http_client
             .get(&path)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
         serde_json::from_str::<Vec<repos::Repo>>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    pub fn list_milestones(&self, user: &str, repo: &str) -> Result<Vec<milestones::Milestone>> {
+    pub fn list_milestones(&self, user: &str, repo: &str) -> Result<Vec<milestones::Milestone>, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones", API_BASE, user, repo);
         let mut res = self.http_client
             .get(&path)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
         serde_json::from_str::<Vec<milestones::Milestone>>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    pub fn get_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone> {
+    pub fn get_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones/{}", API_BASE, user, repo, number);
         let mut res = self.http_client
             .get(&path)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
         serde_json::from_str::<milestones::Milestone>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    pub fn open_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone> {
+    pub fn open_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone, ResponseError> {
         self.update_milestone_state(user, repo, number, &milestones::State::Open)
     }
 
     pub fn get_milestone_with_title(&self, user: &str, repo: &str, title: &str)
-                                    -> Result<milestones::Milestone> {
+                                    -> Result<milestones::Milestone, ResponseError> {
         let milestones = self.list_milestones(user, repo)?;
 
-        milestones.iter().find(|&m| m.title == title)
-            .map(|v| v.clone())
-            .chain_err(|| ErrorKind::NotFound)
-
+        let found = milestones.iter()
+            .find(|&m| m.title == title)
+            .map(|v| v.clone());
+        
+        found.ok_or(ResponseError::NotFound)
     }
 
-    pub fn close_milestone(&self, user: &str, repo: &str, title: &str) -> Result<milestones::Milestone> {
+    pub fn close_milestone(&self, user: &str, repo: &str, title: &str) -> Result<milestones::Milestone, ResponseError> {
         let m = self.get_milestone_with_title(user, repo, title)?;
 
         self.update_milestone_state(user, repo, m.number, &milestones::State::Closed)
     }
 
-    pub fn create_milestone(&self, user: &str, repo: &str, props: &milestones::MilestoneProperties) -> Result<milestones::Milestone> {
+    pub fn create_milestone(&self, user: &str, repo: &str, props: &milestones::MilestoneProperties)
+                            -> Result<milestones::Milestone, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones", API_BASE, user, repo);
 
         let mut res = self.http_client
             .post(&path)
             .json(&props)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         serde_json::from_str::<milestones::Milestone>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    pub fn update_milestone(&self, user: &str, repo: &str, number: u32, patch: &milestones::MilestonePatch) -> Result<milestones::Milestone> {
+    pub fn update_milestone(&self, user: &str, repo: &str, number: u32, patch: &milestones::MilestonePatch)
+                            -> Result<milestones::Milestone, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones/{}", API_BASE, user, repo, number);
 
         let mut res = self.http_client
             .patch(&path)
             .json(&patch)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         let payload = &res.text()
-            .chain_err(|| ErrorKind::HTTPError)?;
+            .map_err(|e| ResponseError::HTTPError(e))?;
 
         serde_json::from_str::<milestones::Milestone>(payload)
-            .chain_err(|| ErrorKind::SerializationError)
+            .map_err(|e| ResponseError::SerializationError(e))
     }
 
-    fn update_milestone_state(&self, user: &str, repo: &str, number: u32, state: &milestones::State) -> Result<milestones::Milestone> {
+    fn update_milestone_state(&self, user: &str, repo: &str, number: u32, state: &milestones::State)
+                              -> Result<milestones::Milestone, ResponseError> {
         let hm = milestones::MilestonePatch {
             title: None,
             state: Some(state.clone()),
@@ -185,19 +173,19 @@ impl Client {
         self.update_milestone(user, repo, number, &hm)
     }
 
-    pub fn delete_milestone_with_title(&self, user: &str, repo: &str, title: &str) -> Result<()> {
+    pub fn delete_milestone_with_title(&self, user: &str, repo: &str, title: &str) -> Result<(), ResponseError> {
         let m = self.get_milestone_with_title(user, repo, title)?;
 
         self.delete_milestone(user, repo, m.number)
     }
 
-    pub fn delete_milestone(&self, user: &str, repo: &str, number: u32) -> Result<()> {
+    pub fn delete_milestone(&self, user: &str, repo: &str, number: u32) -> Result<(), ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones/{}", API_BASE, user, repo, number);
 
         self.http_client
             .delete(&path)
             .send()
-            .chain_err(|| ErrorKind::HTTPError)
+            .map_err(|e| ResponseError::HTTPError(e))
             .map (|_| () )
     }
 }
