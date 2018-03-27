@@ -11,18 +11,6 @@ extern crate failure_derive;
 
 use reqwest::header;
 
-#[derive(Debug, Fail)]
-pub enum ResponseError {
-    #[fail(display = "API responded with 404 Not Found")]
-    NotFound,
-
-    #[fail(display = "HTTP request resulted in an error: {}", _0)]
-    HTTPError(#[cause] reqwest::Error),
-
-    #[fail(display = "JSON serialization failed: {}", _0)]
-    SerializationError(#[cause] serde_json::error::Error)
-}
-
 pub mod milestones;
 pub mod repos;
 pub mod users;
@@ -37,6 +25,30 @@ pub fn client(token: &str) -> Client {
 #[derive(Debug)]
 pub struct Client {
     http_client: self::reqwest::Client
+}
+
+#[derive(Debug, Fail)]
+pub enum ResponseError {
+    #[fail(display = "API responded with 404 Not Found")]
+    NotFound,
+
+    #[fail(display = "HTTP request resulted in an error: {}", _0)]
+    HTTPError(#[cause] reqwest::Error),
+
+    #[fail(display = "JSON serialization failed: {}", _0)]
+    SerializationError(#[cause] serde_json::error::Error)
+}
+
+impl From<reqwest::Error> for ResponseError {
+    fn from(error: reqwest::Error) -> Self {
+        ResponseError::HTTPError(error)
+    }
+}
+
+impl From<serde_json::error::Error> for ResponseError {
+    fn from(error: serde_json::error::Error) -> Self {
+        ResponseError::SerializationError(error)
+    }
 }
 
 impl Client {
@@ -58,52 +70,40 @@ impl Client {
         let path = format!("{}/{}", API_BASE, "user");
         let mut res = self.http_client
             .get(&path)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-        serde_json::from_str::<users::User>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: users::User = res.json()?;
+        Ok(payload)
     }
 
     pub fn list_repos_of_org(&self, org: &str) -> Result<Vec<repos::Repo>, ResponseError> {
         let path = format!("{}/orgs/{}/repos", API_BASE, org);
         let mut res = self.http_client
             .get(&path)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-        serde_json::from_str::<Vec<repos::Repo>>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: Vec<repos::Repo> = res.json()?;
+        Ok(payload)
     }
 
     pub fn list_milestones(&self, user: &str, repo: &str) -> Result<Vec<milestones::Milestone>, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones", API_BASE, user, repo);
         let mut res = self.http_client
             .get(&path)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-        serde_json::from_str::<Vec<milestones::Milestone>>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: Vec<milestones::Milestone> = res.json()?;
+        Ok(payload)
     }
 
     pub fn get_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone, ResponseError> {
         let path = format!("{}/repos/{}/{}/milestones/{}", API_BASE, user, repo, number);
         let mut res = self.http_client
             .get(&path)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-        serde_json::from_str::<milestones::Milestone>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: milestones::Milestone = res.json()?;
+        Ok(payload)
     }
 
     pub fn open_milestone(&self, user: &str, repo: &str, number: u32) -> Result<milestones::Milestone, ResponseError> {
@@ -134,14 +134,10 @@ impl Client {
         let mut res = self.http_client
             .post(&path)
             .json(&props)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-
-        serde_json::from_str::<milestones::Milestone>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: milestones::Milestone = res.json()?;
+        Ok(payload)
     }
 
     pub fn update_milestone(&self, user: &str, repo: &str, number: u32, patch: &milestones::MilestonePatch)
@@ -151,14 +147,10 @@ impl Client {
         let mut res = self.http_client
             .patch(&path)
             .json(&patch)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))?;
+            .send()?;
 
-        let payload = &res.text()
-            .map_err(|e| ResponseError::HTTPError(e))?;
-
-        serde_json::from_str::<milestones::Milestone>(payload)
-            .map_err(|e| ResponseError::SerializationError(e))
+        let payload: milestones::Milestone = res.json()?;
+        Ok(payload)
     }
 
     fn update_milestone_state(&self, user: &str, repo: &str, number: u32, state: &milestones::State)
@@ -184,9 +176,8 @@ impl Client {
 
         self.http_client
             .delete(&path)
-            .send()
-            .map_err(|e| ResponseError::HTTPError(e))
-            .map (|_| () )
+            .send()?;
+        Ok(())
     }
 }
 
