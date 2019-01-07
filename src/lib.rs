@@ -59,7 +59,8 @@ impl Client {
 
     pub fn new(token: &str) -> Client {
         let hs = build_default_headers(token);
-        let mut builder = build_http_request_builder(hs);
+        let builder = reqwest::Client::builder()
+            .default_headers(hs);
 
         Client {
             http_client: builder.build().unwrap()
@@ -185,21 +186,13 @@ impl Client {
 // Implementation
 //
 
-fn build_http_request_builder(hs: reqwest::header::Headers) -> reqwest::ClientBuilder {
-    let mut builder = reqwest::Client::builder();
-    // note: this *appends* to the default set of headers reqwest
-    //       uses
-    builder.default_headers(hs);
-    builder
-}
-
-fn build_default_headers(token: &str) -> reqwest::header::Headers {
+fn build_default_headers(token: &str) -> reqwest::header::HeaderMap {
     let mut authorization_val: String = String::from("token ");
     authorization_val.push_str(token);
 
-    let mut hs = header::Headers::new();
-    hs.set(header::Authorization(authorization_val));
+    let mut hs = header::HeaderMap::new();
+    hs.insert(header::AUTHORIZATION, authorization_val.parse().unwrap());
     // Per https://developer.github.com/v3/#user-agent-required.
-    hs.set(header::UserAgent::new(USER_AGENT));
+    hs.insert(header::USER_AGENT, USER_AGENT.parse().unwrap());
     hs
 }
