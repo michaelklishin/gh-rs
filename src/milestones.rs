@@ -42,7 +42,7 @@ impl<'de> serde::Deserialize<'de> for State {
                     _        => Err(de::Error::unknown_variant(value, &["open", "closed"]))
                 }
             }
-        };
+        }
 
         de.deserialize_identifier(StateVisitor)
     }
